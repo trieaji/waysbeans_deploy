@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	productsdto "golangfnl/dto/products"
@@ -8,8 +9,11 @@ import (
 	"golangfnl/models"
 	"golangfnl/repositories"
 	"net/http"
+	"os"
 	"strconv"
 
+	"github.com/cloudinary/cloudinary-go/v2"
+	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 )
@@ -71,13 +75,14 @@ func (h *handlerProduct) GetProduct(w http.ResponseWriter, r *http.Request) {
 func (h *handlerProduct) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	dataContex := r.Context().Value("dataFile") // add this code
-	filename := dataContex.(string)             // add this code
+	dataContex := r.Context().Value("dataFile")
+	filepath := dataContex.(string)
 
-	fmt.Println(filename)
+	fmt.Println(filepath)
 
 	price, _ := strconv.Atoi(r.FormValue("price")) //mengubah bentuk dari integer ke string
 	stock, _ := strconv.Atoi(r.FormValue("stock")) //mengubah bentuk dari integer ke string
+
 	//Karena sudah tidak menggunakan JSON. Menggunakan form value
 	request := productsdto.CreateProductRequest{
 		Name:  r.FormValue("name"),
@@ -95,11 +100,27 @@ func (h *handlerProduct) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Declare Context Background, Cloud Name, API Key, API Secret ...
+	var ctx = context.Background()
+	var CLOUD_NAME = os.Getenv("CLOUD_NAME")
+	var API_KEY = os.Getenv("API_KEY")
+	var API_SECRET = os.Getenv("API_SECRET")
+
+	// Add your Cloudinary credentials ...
+	cld, _ := cloudinary.NewFromParams(CLOUD_NAME, API_KEY, API_SECRET)
+
+	// Upload file to Cloudinary ...
+	resp, err := cld.Upload.Upload(ctx, filepath, uploader.UploadParams{Folder: "dumbmerch"})
+
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
 	product := models.Product{
 		Name:  request.Name,
 		Price: request.Price,
 		Stock: request.Stock,
-		Image: filename,
+		Image: resp.SecureURL, // Modify store file URL to database from resp.SecureURL ...
 		Desc:  request.Desc,
 	}
 
